@@ -162,6 +162,7 @@ export default function App() {
         </AnimatePresence>
         <AnimatePresence>{!onboarded && <Onboarding key="ob" />}</AnimatePresence>
         <HoverLabel />
+        <div className="credit">© Maria Rita Serpa Pinto · 2026</div>
       </div>
     </MotionConfig>
   )

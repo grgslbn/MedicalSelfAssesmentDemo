@@ -3,6 +3,7 @@ import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { acceleratedRaycast } from 'three-mesh-bvh'
 import { loadBodyGeometry } from './buildBody'
 import { createBodyMaterial } from './bodyMaterial'
 import { REGIONS, REGION_INDEX, regionAt, regionById, regionCenter } from '../data/regions'
@@ -281,7 +282,7 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
   return (
     <group ref={group}>
       {geo && (
-        <mesh geometry={geo} material={mat} castShadow onPointerDown={onDown} onClick={onClick} onPointerMove={onMove} onPointerOut={onOut} />
+        <mesh geometry={geo} material={mat} raycast={acceleratedRaycast} castShadow onPointerDown={onDown} onClick={onClick} onPointerMove={onMove} onPointerOut={onOut} />
       )}
       <Inner glass={glassRef} />
       <Pins />
