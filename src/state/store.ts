@@ -28,6 +28,8 @@ export interface Entry {
   flags: string[]
   notes: string
   createdAt: number
+  /** V0.2: the exact anatomical structure, when the user picked one */
+  structure?: { id: number; label: string }
 }
 
 export interface CheckIn {
@@ -46,6 +48,9 @@ interface State {
   reducedMotion: boolean
   entries: Entry[]
   history: CheckIn[]
+  /** V0.2 anatomy preview (Settings toggle, off by default) */
+  anatomyPreview: boolean
+  anatomyLayers: { bones: boolean; organs: boolean; muscles: boolean }
 
   // transient UI
   view: View
@@ -56,6 +61,11 @@ interface State {
   facing: 'front' | 'back'
   bodyReady: boolean
   openCheckIn: string | null
+  xray: boolean
+  anatomyProgress: number // 0..1 while loading, 1 when ready
+  /** structure picked in 3D or in the sheet, highlighted on the model */
+  focusStructure: number | null
+  hoverText: string | null
 
   set: (p: Partial<State>) => void
   setProfile: (p: Partial<Profile>) => void
@@ -86,6 +96,8 @@ export const useStore = create<State>()(
       reducedMotion: false,
       entries: [],
       history: [],
+      anatomyPreview: false,
+      anatomyLayers: { bones: true, organs: true, muscles: false },
 
       view: 'explore',
       selected: null,
@@ -95,11 +107,15 @@ export const useStore = create<State>()(
       facing: 'front',
       bodyReady: false,
       openCheckIn: null,
+      xray: false,
+      anatomyProgress: 0,
+      focusStructure: null,
+      hoverText: null,
 
       set: (p) => set(p),
       setProfile: (p) => set({ profile: { ...get().profile, ...p } }),
       select: (regionId, hit = null, editingId = null) =>
-        set({ selected: regionId, pendingPoint: hit, editingId }),
+        set({ selected: regionId, pendingPoint: hit, editingId, focusStructure: editingId ? get().entries.find((e) => e.id === editingId)?.structure?.id ?? null : null }),
       saveEntry: (e) => {
         const { editingId, entries } = get()
         if (editingId) {
@@ -107,7 +123,7 @@ export const useStore = create<State>()(
         } else {
           set({ entries: [...entries, { ...e, id: uid(), createdAt: Date.now() }] })
         }
-        set({ selected: null, pendingPoint: null, editingId: null })
+        set({ selected: null, pendingPoint: null, editingId: null, focusStructure: null })
       },
       removeEntry: (id) => set({ entries: get().entries.filter((x) => x.id !== id), selected: null, editingId: null }),
       commitCheckIn: (level) => {
@@ -129,6 +145,7 @@ export const useStore = create<State>()(
       partialize: (s) => ({
         onboarded: s.onboarded, profile: s.profile, bodyStyle: s.bodyStyle, theme: s.theme,
         reducedMotion: s.reducedMotion, entries: s.entries, history: s.history,
+        anatomyPreview: s.anatomyPreview, anatomyLayers: s.anatomyLayers,
       }),
     },
   ),

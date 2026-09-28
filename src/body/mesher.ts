@@ -20,6 +20,8 @@ export interface Patch extends Box {
   inflate?: number
   /** randomly offset cell vertices by this fraction of a cell (irregular facets) */
   jitter?: number
+  /** mesh these primitives instead of the body sculpt */
+  source?: Prim[]
 }
 export interface MeshData { positions: Float32Array; normals: Float32Array; indices: Uint32Array }
 
@@ -59,7 +61,7 @@ export function meshPatch(patch: Patch): MeshData {
   for (let sk = 0; sk < nz; sk += S) for (let sj = 0; sj < ny; sj += S) for (let si = 0; si < nx; si += S) {
     const ek = Math.min(sk + S, nz) - 1, ej = Math.min(sj + S, ny) - 1, ei = Math.min(si + S, nx) - 1
     const smin: Vec3 = [px(si), py(sj), pz(sk)], smax: Vec3 = [px(ei), py(ej), pz(ek)]
-    const sList = primsNear(smin, smax)
+    const sList = primsNear(smin, smax, 0.03, patch.source)
     for (let bk = sk; bk <= ek; bk += B) for (let bj = sj; bj <= ej; bj += B) for (let bi = si; bi <= ei; bi += B) {
       const ck = Math.min(bk + B, ek + 1) - 1, cj = Math.min(bj + B, ej + 1) - 1, ci = Math.min(bi + B, ei + 1) - 1
       const bmin: Vec3 = [px(bi), py(bj), pz(bk)], bmax: Vec3 = [px(ci), py(cj), pz(ck)]

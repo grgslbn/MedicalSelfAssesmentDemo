@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { acceleratedRaycast } from 'three-mesh-bvh'
 import { loadBodyGeometry } from './buildBody'
+import { Anatomy, anatomyFx, structuresInZone } from '../anatomy/Anatomy'
 import { createBodyMaterial } from './bodyMaterial'
 import { REGIONS, REGION_INDEX, regionAt, regionById, regionCenter } from '../data/regions'
 import { useStore } from '../state/store'
@@ -109,7 +110,7 @@ function Inner({ glass }: { glass: React.MutableRefObject<number> }) {
   const boneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#dfeeff', emissive: '#8fc6ff', emissiveIntensity: 0.9, roughness: 0.5 }), [])
   useFrame(({ clock }) => {
     const g = glass.current
-    group.current.visible = g > 0.05
+    group.current.visible = g > 0.05 && anatomyFx.reveal < 0.05
     const t = clock.elapsedTime
     // lub-dub, ~64 bpm
     const beat = Math.pow(Math.max(0, Math.sin(t * 6.8)), 12) + 0.6 * Math.pow(Math.max(0, Math.sin(t * 6.8 - 0.9)), 12)
@@ -227,7 +228,8 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
     glassRef.current = reduced ? gGoal : damp(glassRef.current, gGoal, 3.2, dt)
     const g = glassRef.current
     uniforms.uGlass.value = g
-    const trans = g < 0.01 ? 0 : g
+    // no transmission while the skin is cut open or see-through (last frame's state is fine here)
+    const trans = g < 0.01 || anatomyFx.win.w > 0.001 || uniforms.uXray.value > 0.01 ? 0 : g
     if ((mat.transmission > 0) !== (trans > 0)) mat.needsUpdate = true
     mat.transmission = trans
     mat.roughness = THREE.MathUtils.lerp(0.62, 0.16, g)
@@ -272,6 +274,26 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
     edgeMat.opacity = w.edgeA * (1 - squash)
     uniforms.uRimAmt.value += squash * 0.9 // the flash
 
+    // V0.2 anatomy: open a window in the skin at the tapped spot, or go see-through in X-ray
+    const zoneHasAnatomy = !!(s.anatomyPreview && s.selected && s.selected !== 'general' && s.pendingPoint && structuresInZone(s.selected).length)
+    const win = anatomyFx.win
+    if (zoneHasAnatomy) {
+      const [px, py, pz] = s.pendingPoint!.point, [nx, ny, nz] = s.pendingPoint!.normal
+      win.x = px - nx * 0.012; win.y = py - ny * 0.012; win.z = pz - nz * 0.012
+    }
+    const winGoal = zoneHasAnatomy ? THREE.MathUtils.clamp(regionById(s.selected!).r * 1.2 + 0.03, 0.055, 0.15) : 0
+    win.w = reduced ? winGoal : damp(win.w, winGoal, 6, dt)
+    if (win.w < 0.002 && winGoal === 0) win.w = 0
+    uniforms.uWin.value.copy(win)
+    const xGoal = s.anatomyPreview && s.xray && anatomyFx.data ? 1 : 0
+    uniforms.uXray.value = reduced ? xGoal : damp(uniforms.uXray.value, xGoal, 5, dt)
+    const cutaway = win.w > 0.001 || uniforms.uXray.value > 0.01
+    const side = cutaway ? THREE.DoubleSide : THREE.FrontSide
+    if (mat.side !== side) { mat.side = side; mat.needsUpdate = true }
+    const see = uniforms.uXray.value > 0.01
+    mat.depthWrite = !see
+    edgeMat.opacity *= 1 - uniforms.uXray.value
+
     // per-zone glow & tint
     const selIdx = s.selected && s.selected !== 'general' ? REGION_INDEX[s.selected] : -1
     const hovIdx = s.hovered ? REGION_INDEX[s.hovered] : -1
@@ -300,16 +322,23 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
     group.current.position.y = (1 - k) * -0.12
     group.current.scale.set(1 + breathe * 0.6 + squash * 0.02, 1 + breathe - squash * 0.035, 1 + breathe * 0.6 + squash * 0.02)
     mat.opacity = k
-    mat.transparent = k < 1
+    mat.transparent = k < 1 || see
   })
 
   const down = useRef<{ x: number; y: number } | null>(null)
   const onDown = (e: ThreeEvent<PointerEvent>) => { down.current = { x: e.clientX, y: e.clientY } }
+  /** Taps inside the skin window, or on visible anatomy in X-ray, belong to the anatomy. */
+  const passThrough = (e: ThreeEvent<PointerEvent | MouseEvent>, local: THREE.Vector3) => {
+    const w = anatomyFx.win
+    if (w.w > 0.001 && local.distanceTo(new THREE.Vector3(w.x, w.y, w.z)) < w.w) return true
+    return anatomyFx.reveal > 0.5 && useStore.getState().xray && e.intersections.some((i) => i.object.userData.anatomy)
+  }
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation()
     const d = down.current
-    if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return
+    if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) { e.stopPropagation(); return }
     const local = group.current.worldToLocal(e.point.clone())
+    if (passThrough(e, local)) return
+    e.stopPropagation()
     const r = regionAt([local.x, local.y, local.z])
     const n = e.face?.normal ?? new THREE.Vector3(0, 0, 1)
     select(r.id, { point: [local.x, local.y, local.z], normal: [n.x, n.y, n.z] })
@@ -317,8 +346,10 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
   }
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     if (e.pointerType !== 'mouse') return
-    e.stopPropagation()
     const local = group.current.worldToLocal(e.point.clone())
+    if (passThrough(e, local)) return
+    e.stopPropagation()
+    if (useStore.getState().hoverText) set({ hoverText: null })
     const id = regionAt([local.x, local.y, local.z]).id
     if (useStore.getState().hovered !== id) set({ hovered: id })
     document.body.style.cursor = 'pointer'
@@ -332,6 +363,7 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
       )}
       {edges && shown === 'lowpoly' && <lineSegments geometry={edges} material={edgeMat} raycast={() => null} />}
       <Inner glass={glassRef} />
+      <Anatomy />
       <Pins />
     </group>
   )

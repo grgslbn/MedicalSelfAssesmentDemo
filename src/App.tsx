@@ -7,6 +7,7 @@ import { Icon } from './ui/icons'
 import { IconButton, Segmented, ease, spring } from './ui/kit'
 import { useIsDark, useSystemReducedMotion } from './ui/hooks'
 import { Logo, Onboarding } from './ui/Onboarding'
+import { ANATOMY_CREDIT } from './anatomy/data'
 import { SymptomSheet } from './ui/SymptomSheet'
 import { Summary } from './ui/Summary'
 import { History } from './ui/History'
@@ -53,13 +54,28 @@ function Dock() {
   const set = useStore((s) => s.set)
   const select = useStore((s) => s.select)
   const level = entries.length ? triage(entries, profile, history).level : -1
+  const preview = useStore((s) => s.anatomyPreview)
+  const progress = useStore((s) => s.anatomyProgress)
+  const xray = useStore((s) => s.xray)
+  const layers = useStore((s) => s.anatomyLayers)
+  const loading = preview && progress < 1
   return (
     <motion.div className="dock-wrap" initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} transition={spring}>
       <AnimatePresence mode="wait">
+        {xray ? (
+          <motion.div key="layers" className="layer-chips" role="group" aria-label="Anatomy layers" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease }}>
+            {(['bones', 'organs', 'muscles'] as const).map((l) => (
+              <button key={l} className={layers[l] ? 'on' : ''} aria-pressed={layers[l]} onClick={() => set({ anatomyLayers: { ...layers, [l]: !layers[l] } })}>
+                {l === 'bones' ? 'Bones' : l === 'organs' ? 'Organs' : 'Muscles'}
+              </button>
+            ))}
+          </motion.div>
+        ) : (
         <motion.div key={entries.length ? 'more' : 'first'} className="dock-hint" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4, ease }}>
           <span className="hint-dot" />
           {entries.length ? 'Tap another spot, or review your check-in' : 'Tap where you feel something · drag to turn'}
         </motion.div>
+        )}
       </AnimatePresence>
       <div className="dock">
         <motion.button className="dock-btn" whileTap={{ scale: 0.94 }} onClick={() => select('general')}>
@@ -69,6 +85,13 @@ function Dock() {
           <motion.span animate={{ rotateY: facing === 'back' ? 180 : 0 }} transition={spring} style={{ display: 'inline-flex' }}><Icon.flip size={20} /></motion.span>
           <span>{facing === 'front' ? 'Back' : 'Front'}</span>
         </motion.button>
+        {preview && (
+          <motion.button className={`dock-btn ${xray ? 'on' : ''}`} whileTap={{ scale: 0.94 }} disabled={loading} aria-pressed={xray}
+            onClick={() => set({ xray: !xray })} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}>
+            {loading ? <span className="mini-ring" style={{ ['--p' as string]: `${Math.round(progress * 100)}%` }} /> : <Icon.scan size={20} />}
+            <span>{loading ? `${Math.round(progress * 100)}%` : 'X-ray'}</span>
+          </motion.button>
+        )}
         <motion.button className={`dock-btn primary ${entries.length ? '' : 'idle'}`} whileTap={{ scale: 0.94 }} onClick={() => set({ view: 'summary' })}>
           <span className="review-count">
             <AnimatePresence mode="popLayout">
@@ -83,6 +106,16 @@ function Dock() {
   )
 }
 
+function Credit() {
+  const preview = useStore((s) => s.anatomyPreview)
+  return (
+    <div className="credit">
+      © Maria Rita Serpa Pinto · 2026
+      {preview && <span className="credit-anatomy">{ANATOMY_CREDIT}</span>}
+    </div>
+  )
+}
+
 function HoverLabel() {
   const hovered = useStore((s) => s.hovered)
   const selected = useStore((s) => s.selected)
@@ -92,12 +125,13 @@ function HoverLabel() {
     window.addEventListener('pointermove', on)
     return () => window.removeEventListener('pointermove', on)
   }, [])
-  const show = hovered && hovered !== selected
+  const hoverText = useStore((s) => s.hoverText)
+  const show = (hovered && hovered !== selected) || hoverText
   return (
     <AnimatePresence>
       {show && (
         <motion.div className="hover-label" style={{ left: pos.x, top: pos.y }} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.18 }}>
-          {regionById(hovered).label}
+          {hoverText ?? (hovered ? regionById(hovered).label : '')}
         </motion.div>
       )}
     </AnimatePresence>
@@ -120,6 +154,7 @@ function Loader() {
 
 export default function App() {
   const onboarded = useStore((s) => s.onboarded)
+  const anatomyPreview = useStore((s) => s.anatomyPreview)
   const view = useStore((s) => s.view)
   const selected = useStore((s) => s.selected)
   const theme = useStore((s) => s.theme)
@@ -142,6 +177,7 @@ export default function App() {
       const s = useStore.getState()
       if (s.selected) s.select(null)
       else if (s.view !== 'explore') s.set({ view: 'explore' })
+      else if (s.xray) s.set({ xray: false })
     }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
@@ -149,7 +185,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion={reduced ? 'always' : 'never'}>
-      <div className={`app ${onboarded ? 'ready' : 'welcome'}`}>
+      <div className={`app ${onboarded ? 'ready' : 'welcome'} ${anatomyPreview ? 'anatomy-on' : ''}`}>
         <Suspense fallback={null}><Scene /></Suspense>
         <Loader />
         <AnimatePresence>{onboarded && <TopBar key="top" />}</AnimatePresence>
@@ -162,7 +198,7 @@ export default function App() {
         </AnimatePresence>
         <AnimatePresence>{!onboarded && <Onboarding key="ob" />}</AnimatePresence>
         <HoverLabel />
-        <div className="credit">© Maria Rita Serpa Pinto · 2026</div>
+        <Credit />
       </div>
     </MotionConfig>
   )
