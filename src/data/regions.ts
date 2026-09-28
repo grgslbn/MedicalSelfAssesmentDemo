@@ -36,7 +36,7 @@ export const REGIONS: Region[] = [
   ...mirrored('shoulder', 'shoulder', { group: 'shoulder', a: [0.19, 1.4, -0.01], b: [0.19, 1.4, -0.01], r: 0.055, side: 'any', zoom: 1.1 }),
   ...mirrored('upperArm', 'upper arm', { group: 'upperArm', a: [0.205, 1.34, -0.01], b: [0.24, 1.17, -0.02], r: 0.042, side: 'any', zoom: 1.2 }),
   ...mirrored('forearm', 'elbow & forearm', { group: 'forearm', a: [0.247, 1.12, -0.02], b: [0.29, 0.92, 0.015], r: 0.034, side: 'any', zoom: 1.2 }),
-  ...mirrored('hand', 'hand & wrist', { group: 'hand', a: [0.298, 0.885, 0.025], b: [0.305, 0.79, 0.03], r: 0.03, side: 'any', zoom: 0.9 }),
+  ...mirrored('hand', 'hand & wrist', { group: 'hand', a: [0.298, 0.885, 0.025], b: [0.315, 0.75, 0.045], r: 0.03, side: 'any', zoom: 0.9 }),
   ...mirrored('thigh', 'thigh', { group: 'thigh', a: [0.086, 0.85, 0], b: [0.094, 0.585, 0.005], r: 0.07, side: 'any', zoom: 1.35 }),
   ...mirrored('knee', 'knee', { group: 'knee', a: [0.096, 0.5, 0.01], b: [0.096, 0.5, 0.01], r: 0.05, side: 'any', zoom: 1.0 }),
   ...mirrored('shin', 'lower leg', { group: 'shin', a: [0.097, 0.42, -0.01], b: [0.1, 0.12, -0.01], r: 0.042, side: 'any', zoom: 1.3 }),

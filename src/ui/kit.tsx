@@ -46,13 +46,13 @@ export function Chips({ options, value, onChange, multi = true, tone }: {
 }
 
 export function Segmented<T extends string>({ options, value, onChange, size = 'md', label }: {
-  options: { id: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; size?: 'sm' | 'md'; label: string
+  options: { id: T; label: ReactNode; aria?: string }[]; value: T; onChange: (v: T) => void; size?: 'sm' | 'md'; label: string
 }) {
   const id = useId()
   return (
     <div className={`seg seg-${size}`} role="radiogroup" aria-label={label}>
       {options.map((o) => (
-        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} className={value === o.id ? 'on' : ''} onClick={() => onChange(o.id)}>
+        <button key={o.id} type="button" role="radio" aria-label={o.aria} title={o.aria} aria-checked={value === o.id} className={value === o.id ? 'on' : ''} onClick={() => onChange(o.id)}>
           {value === o.id && <motion.span layoutId={`seg-${id}`} className="seg-pill" transition={spring} />}
           <span className="seg-label">{o.label}</span>
         </button>

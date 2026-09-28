@@ -12,6 +12,9 @@ import { IconButton, Sheet, Stagger, item, spring } from './kit'
 
 const LEVEL_ICON = [Icon.leaf, Icon.stethoscope, Icon.clock, Icon.phone]
 
+/** Printing is unavailable inside sandboxed embeds (e.g. preview frames). */
+const canPrint = (() => { try { return window.self === window.top } catch { return false } })()
+
 export function UrgencyCard({ level, reasons, action }: { level: number; reasons: string[]; action: string }) {
   const L = LEVELS[level]
   const Ico = LEVEL_ICON[level]
@@ -137,7 +140,7 @@ export function Summary() {
       </div>
       {entries.length > 0 && (
         <footer className="sheet-foot">
-          <button className="btn ghost" onClick={() => window.print()}><Icon.print size={18} /> Print for doctor</button>
+          {canPrint ? <button className="btn ghost" onClick={() => window.print()}><Icon.print size={18} /> Print for doctor</button> : <span />}
           <motion.button className="btn primary" whileTap={{ scale: 0.96 }} onClick={() => commit(t.level)}>
             <Icon.check size={18} /> Save check-in
           </motion.button>

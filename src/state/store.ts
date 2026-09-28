@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 
 export type Sex = 'female' | 'male' | 'intersex' | 'unspecified'
-export type BodyStyle = 'clay' | 'glass'
+export type BodyStyle = 'clay' | 'glass' | 'poly'
 export type Theme = 'system' | 'light' | 'dark'
 export type View = 'explore' | 'summary' | 'history' | 'settings'
 

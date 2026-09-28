@@ -37,7 +37,7 @@ function TopBar() {
       </div>
       <div className="top-actions">
         <Segmented<BodyStyle> label="Body style" size="sm" value={bodyStyle} onChange={(v) => set({ bodyStyle: v })}
-          options={[{ id: 'clay', label: <><Icon.clay size={15} /><span className="hide-xs">Clay</span></> }, { id: 'glass', label: <><Icon.glass size={15} /><span className="hide-xs">Glass</span></> }]} />
+          options={[{ id: 'clay', aria: 'Clay', label: <><Icon.clay size={15} /><span className="hide-xs">Clay</span></> }, { id: 'glass', aria: 'Glass', label: <><Icon.glass size={15} /><span className="hide-xs">Glass</span></> }, { id: 'poly', aria: 'Low poly', label: <><Icon.poly size={15} /><span className="hide-xs">Poly</span></> }]} />
         <IconButton label="History" onClick={() => toggle('history')} className={view === 'history' ? 'on' : ''}><Icon.history /></IconButton>
         <IconButton label="Settings" onClick={() => toggle('settings')} className={view === 'settings' ? 'on' : ''}><Icon.settings /></IconButton>
       </div>
@@ -162,6 +162,7 @@ export default function App() {
         </AnimatePresence>
         <AnimatePresence>{!onboarded && <Onboarding key="ob" />}</AnimatePresence>
         <HoverLabel />
+        <div className="credit">© Maria Rita Serpa Pinto · 2026</div>
       </div>
     </MotionConfig>
   )

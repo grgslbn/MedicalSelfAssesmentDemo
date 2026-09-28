@@ -71,7 +71,7 @@ export function Settings() {
             <div className="field">
               <span className="field-top"><span>Body style</span></span>
               <Segmented<BodyStyle> label="Body style" value={s.bodyStyle} onChange={(v) => s.set({ bodyStyle: v })}
-                options={[{ id: 'clay', label: <><Icon.clay size={16} /> Clay</> }, { id: 'glass', label: <><Icon.glass size={16} /> Glass</> }]} />
+                options={[{ id: 'clay', label: <><Icon.clay size={16} /> Clay</> }, { id: 'glass', label: <><Icon.glass size={16} /> Glass</> }, { id: 'poly', label: <><Icon.poly size={16} /> Low poly</> }]} />
             </div>
             <div className="field">
               <span className="field-top"><span>Theme</span></span>

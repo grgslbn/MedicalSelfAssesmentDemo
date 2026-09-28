@@ -109,7 +109,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 }
 .icon-btn:hover { background: var(--surface-solid); }
 .icon-btn.on { background: var(--ink); color: var(--paper); }
-@media (max-width: 380px) { .hide-xs { display: none; } }
+@media (max-width: 480px) { .hide-xs { display: none; } .topbar .seg button { padding: 8px 11px; } }
 
 /* ─────────────────────────────  Segmented  ───────────────────────────── */
 .seg {
@@ -437,10 +437,22 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* ─────────────────────────────  Credit  ───────────────────────────── */
+.credit {
+  position: fixed; z-index: 60; left: 14px; bottom: calc(env(safe-area-inset-bottom) + 6px);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--muted);
+  opacity: 0.85; pointer-events: none; user-select: none; white-space: nowrap;
+}
+/* leave room for the credit under sheet footers and the dock */
+.sheet-foot { padding-bottom: 24px; }
+.dock-wrap { bottom: calc(env(safe-area-inset-bottom) + 26px); }
+.onboarding { padding-bottom: calc(env(safe-area-inset-bottom) + 26px); }
+
 /* ─────────────────────────────  Print: the summary for a doctor  ───────────────────────────── */
 @media print {
   body { overflow: visible; background: #fff; color: #000; }
   .app { position: static; }
+  .credit { position: static; display: block; margin-top: 16px; }
   .scene, .topbar, .dock-wrap, .grabber, .sheet-foot, .hover-label, .loader, .sheet-head .icon-btn { display: none !important; }
   .sheet { position: static !important; transform: none !important; opacity: 1 !important; box-shadow: none; backdrop-filter: none; background: #fff; max-height: none !important; width: auto !important; }
   .sheet-body { overflow: visible; }

@@ -1,6 +1,6 @@
-import { buildBodyArrays } from './buildBody.ts'
+import { buildBodyArrays, buildLowPolyArrays, type BodyKind } from './buildBody.ts'
 
-self.onmessage = (e: MessageEvent<{ resolution: number }>) => {
-  const { positions, normals } = buildBodyArrays(e.data.resolution)
-  ;(self as unknown as Worker).postMessage({ positions, normals }, [positions.buffer, normals.buffer])
+self.onmessage = (e: MessageEvent<{ kind: BodyKind; detail: number }>) => {
+  const m = e.data.kind === 'lowpoly' ? buildLowPolyArrays() : buildBodyArrays(e.data.detail)
+  ;(self as unknown as Worker).postMessage(m, [m.positions.buffer, m.normals.buffer, m.indices.buffer])
 }
