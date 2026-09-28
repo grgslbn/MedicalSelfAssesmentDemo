@@ -7,8 +7,12 @@ import { intensityColor } from './colors'
 import { Icon } from './icons'
 import { IntensityPicker } from './IntensityPicker'
 import { Chips, IconButton, Sheet, ease, spring } from './kit'
+import { pickList } from '../anatomy/Anatomy'
+import { LAYERS } from '../anatomy/data'
 
-const STEPS = ['What', 'How much', 'Since when', 'Anything else']
+type StepKey = 'where' | 'what' | 'how' | 'when' | 'else'
+const STEP_LABEL: Record<StepKey, string> = { where: 'Where', what: 'What', how: 'How much', when: 'Since when', else: 'Anything else' }
+const LAYER_TITLE = { bones: 'Bones', organs: 'Organs', muscles: 'Muscles' } as const
 
 type Draft = Omit<Entry, 'id' | 'createdAt' | 'regionId' | 'point' | 'normal'>
 
@@ -48,6 +52,29 @@ export function SymptomSheet() {
   const flags = useMemo(() => redFlagsFor(group), [group])
   const others = entries.filter((e) => e.regionId === selected && e.id !== editingId)
 
+  // V0.2: pinpoint the exact structure when the anatomy preview is on
+  const anatomyReady = useStore((s) => s.anatomyPreview && s.anatomyProgress >= 1)
+  const focusStructure = useStore((s) => s.focusStructure)
+  const layers = useStore((s) => s.anatomyLayers)
+  const setStore = useStore((s) => s.set)
+  const tapX = pending?.point[0] ?? existing?.point?.[0]
+  const zoneStructures = useMemo(() => (anatomyReady && !general ? pickList(selected, tapX) : []), [anatomyReady, general, selected, tapX])
+  const withWhere = zoneStructures.length > 0
+  const steps: StepKey[] = withWhere ? ['where', 'what', 'how', 'when', 'else'] : ['what', 'how', 'when', 'else']
+  const key = steps[Math.min(step, steps.length - 1)]
+  const isLast = step >= steps.length - 1
+  const whatIndex = steps.indexOf('what')
+  // a structure tapped in 3D becomes the answer to "Where exactly?"
+  useEffect(() => {
+    const st = zoneStructures.find((z) => z.id === focusStructure)
+    if (st) setDraft((d) => (d.structure?.id === st.id ? d : { ...d, structure: { id: st.id, label: st.label } }))
+  }, [focusStructure, zoneStructures])
+  const pickStructure = (id: number | null) => {
+    const st = zoneStructures.find((z) => z.id === id)
+    setDraft((d) => ({ ...d, structure: st ? { id: st.id, label: st.label } : undefined }))
+    setStore({ focusStructure: st ? st.id : null })
+  }
+
   const up = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))
   const body = useRef<HTMLDivElement>(null)
   const go = (n: number) => { setDir(n > step ? 1 : -1); setStep(n); body.current?.scrollTo({ top: 0 }) }
@@ -71,7 +98,7 @@ export function SymptomSheet() {
         <IconButton label="Close" onClick={close}><Icon.close /></IconButton>
       </header>
 
-      {others.length > 0 && step === 0 && (
+      {others.length > 0 && step <= whatIndex && (
         <div className="already">
           Already logged here:{' '}
           {others.map((o) => (
@@ -82,11 +109,11 @@ export function SymptomSheet() {
         </div>
       )}
 
-      <nav className="stepper" aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <button key={s} className={`step ${i === step ? 'on' : ''} ${i < step ? 'done' : ''}`} onClick={() => (i === 0 || canSave) && go(i)} aria-current={i === step}>
+      <nav className="stepper" aria-label="Steps" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
+        {steps.map((s, i) => (
+          <button key={s} className={`step ${i === step ? 'on' : ''} ${i < step ? 'done' : ''}`} onClick={() => (i <= whatIndex || canSave) && go(i)} aria-current={i === step}>
             <span className="bar"><motion.span initial={false} animate={{ scaleX: i <= step ? 1 : 0 }} transition={spring} /></span>
-            <span className="lbl">{s}</span>
+            <span className="lbl">{STEP_LABEL[s]}</span>
           </button>
         ))}
       </nav>
@@ -105,14 +132,37 @@ export function SymptomSheet() {
             initial="enter" animate="center" exit="exit"
             transition={{ duration: 0.42, ease }}
           >
-            {step === 0 && (
+            {key === 'where' && (
+              <>
+                <h3>Where exactly?</h3>
+                <p className="hint">Tap a structure inside the window, or pick one below. Not sure? Just continue.</p>
+                <div className="structure-list">
+                  {LAYERS.map((l) => {
+                    const list = zoneStructures.filter((z) => z.layer === l)
+                    if (!list.length) return null
+                    return (
+                      <div key={l} className="structure-group">
+                        <small>{LAYER_TITLE[l]}</small>
+                        <Chips multi={false} options={list.map((z) => ({ id: String(z.id), label: z.label }))}
+                          value={draft.structure ? [String(draft.structure.id)] : []}
+                          onChange={(v) => { pickStructure(v[0] ? Number(v[0]) : null); if (v[0] && !layers[l]) setStore({ anatomyLayers: { ...layers, [l]: true } }) }} />
+                      </div>
+                    )
+                  })}
+                </div>
+                <h4>Show layers</h4>
+                <Chips options={LAYERS.map((l) => ({ id: l, label: LAYER_TITLE[l] }))} value={LAYERS.filter((l) => layers[l])}
+                  onChange={(v) => setStore({ anatomyLayers: { bones: v.includes('bones'), organs: v.includes('organs'), muscles: v.includes('muscles') } })} />
+              </>
+            )}
+            {key === 'what' && (
               <>
                 <h3>What do you feel?</h3>
                 <p className="hint">Pick everything that fits.</p>
                 <Chips options={symptoms} value={draft.symptoms} onChange={(v) => up({ symptoms: v })} />
               </>
             )}
-            {step === 1 && (
+            {key === 'how' && (
               <>
                 <h3>How strong is it right now?</h3>
                 <IntensityPicker value={draft.intensity} onChange={(v) => up({ intensity: v })} />
@@ -120,7 +170,7 @@ export function SymptomSheet() {
                 <Chips options={QUALITIES} value={draft.qualities} onChange={(v) => up({ qualities: v })} />
               </>
             )}
-            {step === 2 && (
+            {key === 'when' && (
               <>
                 <h3>Since when?</h3>
                 <Chips options={ONSETS} value={draft.onset ? [draft.onset] : []} multi={false} onChange={(v) => up({ onset: v[0] ?? '' })} />
@@ -128,7 +178,7 @@ export function SymptomSheet() {
                 <Chips options={PATTERNS} value={draft.patterns} onChange={(v) => up({ patterns: v })} />
               </>
             )}
-            {step === 3 && (
+            {key === 'else' && (
               <>
                 {flags.length > 0 && (
                   <>
@@ -155,11 +205,11 @@ export function SymptomSheet() {
           <button className="btn ghost danger" onClick={() => removeEntry(editingId)}><Icon.trash size={18} /> Remove</button>
         ) : <span />}
         <div className="foot-right">
-          {step > 0 && step < 3 && canSave && (
+          {step > whatIndex && !isLast && canSave && (
             <button className="btn ghost" onClick={save}>Save now</button>
           )}
-          {step < 3 ? (
-            <motion.button className="btn primary" disabled={!canSave} onClick={() => go(step + 1)} whileTap={{ scale: 0.96 }}>
+          {!isLast ? (
+            <motion.button className="btn primary" disabled={step >= whatIndex && !canSave} onClick={() => go(step + 1)} whileTap={{ scale: 0.96 }}>
               Next <Icon.arrow size={18} />
             </motion.button>
           ) : (

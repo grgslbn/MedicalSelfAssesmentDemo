@@ -69,6 +69,11 @@ function ell(c: Vec3, rad: Vec3, { k = 0.03, sub = false, mirror = false }: Opts
 }
 const sphere = (c: Vec3, r: number, o: Opts = {}) => ell(c, [r, r, r], o)
 
+/** A standalone sphere primitive (used to build organ envelopes outside the body sculpt). */
+export function makeSphere(c: Vec3, r: number, k: number): Prim {
+  return pad({ kind: Kind.Ell, sub: false, a: c, b: O, r1: 0, r2: 0, u: X, v: Y, w: Z, rad: [r, r, r], k })
+}
+
 // ── Sculpt ────────────────────────────────────────────────────────────────
 // Head: cranium, facial mask, jaw and chin
 ell([0, 1.648, -0.006], [0.075, 0.092, 0.091], { k: 0.03 })
@@ -254,8 +259,8 @@ export function sdfWith(list: Prim[], x: number, y: number, z: number): number {
 export const bodySDF = (x: number, y: number, z: number) => sdfWith(prims, x, y, z)
 
 /** Primitives that can influence any point inside the box (grown by `margin`). */
-export function primsNear(min: Vec3, max: Vec3, margin = 0.03): Prim[] {
-  return prims.filter((p) => {
+export function primsNear(min: Vec3, max: Vec3, margin = 0.03, list: Prim[] = prims): Prim[] {
+  return list.filter((p) => {
     const g = p.k + margin
     return p.max[0] + g >= min[0] && p.min[0] - g <= max[0] &&
       p.max[1] + g >= min[1] && p.min[1] - g <= max[1] &&

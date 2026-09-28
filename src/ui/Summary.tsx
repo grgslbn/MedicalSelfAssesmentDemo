@@ -57,6 +57,7 @@ export function EntryCard({ e, onEdit }: { e: Entry; onEdit?: () => void }) {
       <span className="entry-score"><b>{e.intensity}</b><small>{intensityWord(e.intensity)}</small></span>
       <span className="entry-main">
         <span className="entry-where">{where}</span>
+        {e.structure && <span className="entry-structure">{e.structure.label}</span>}
         <span className="entry-what">{e.symptoms.map(symptomLabel).join(', ')}</span>
         {details && <span className="entry-detail">{details}</span>}
         {e.flags.length > 0 && <span className="entry-flag"><Icon.alert size={13} /> {e.flags.length} warning sign{e.flags.length > 1 ? 's' : ''}</span>}

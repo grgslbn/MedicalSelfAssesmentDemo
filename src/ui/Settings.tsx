@@ -84,6 +84,29 @@ export function Settings() {
             </label>
           </motion.div>
 
+          <motion.h4 variants={item}>Preview <span className="count">V0.2</span></motion.h4>
+          <motion.div variants={item} className="card form">
+            <label className="switch-row">
+              <span>
+                Anatomy layer
+                <small className="switch-sub">See bones, organs and muscles under the skin, and pinpoint exactly where it hurts.</small>
+              </span>
+              <input type="checkbox" className="switch" checked={s.anatomyPreview}
+                onChange={(e) => s.set({ anatomyPreview: e.target.checked, xray: false })} />
+            </label>
+            {s.anatomyPreview && (
+              <p className="fine" style={{ margin: 0 }}>
+                {s.anatomyProgress < 1 ? `Downloading anatomy… ${Math.round(s.anatomyProgress * 100)}% (about 4 MB)` : 'Ready. Tap a zone to look inside, or use X-ray in the dock.'}
+              </p>
+            )}
+            <p className="fine" style={{ margin: 0 }}>
+              Anatomy: <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/" target="_blank" rel="noreferrer">BodyParts3D</a> 4.0,
+              © The Database Center for Life Science, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>,
+              via <a href="https://github.com/ashemag/human-atlas" target="_blank" rel="noreferrer">human-atlas</a>. Adapted for Soma: a subset of
+              structures, simplified and reshaped to fit this figure; lungs and liver are approximations. Based on an adult male reference.
+            </p>
+          </motion.div>
+
           <motion.h4 variants={item}>Your data</motion.h4>
           <motion.div variants={item} className="card">
             <p className="fine" style={{ marginTop: 0 }}>Everything stays on this device, in your browser. Nothing is sent anywhere.</p>

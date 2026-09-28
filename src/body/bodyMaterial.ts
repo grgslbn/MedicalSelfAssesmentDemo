@@ -1,4 +1,4 @@
-import { Color, MeshPhysicalMaterial, Vector3 } from 'three'
+import { Color, MeshPhysicalMaterial, Vector3, Vector4 } from 'three'
 import { REGIONS } from '../data/regions'
 
 const N = REGIONS.length
@@ -18,6 +18,10 @@ export interface BodyUniforms {
   uRimAmt: { value: number }
   uTime: { value: number }
   uGlass: { value: number }
+  /** V0.2 anatomy window: centre (local space) + radius; radius 0 = closed */
+  uWin: { value: Vector4 }
+  /** V0.2 X-ray: 0 = solid skin, 1 = see-through */
+  uXray: { value: number }
 }
 
 export function createBodyMaterial() {
@@ -53,6 +57,8 @@ export function createBodyMaterial() {
     uRimAmt: { value: 0.25 },
     uTime: { value: 0 },
     uGlass: { value: 0 },
+    uWin: { value: new Vector4(0, 0, 0, 0) },
+    uXray: { value: 0 },
   }
 
   mat.onBeforeCompile = (shader) => {
@@ -71,6 +77,7 @@ export function createBodyMaterial() {
         uniform float uGlow[NREG]; uniform vec3 uTint[NREG]; uniform float uTintAmt[NREG];
         uniform float uFocus; uniform float uFocusIdx; uniform vec3 uAccent; uniform vec3 uRim;
         uniform float uRimAmt; uniform float uTime; uniform float uGlass;
+        uniform vec4 uWin; uniform float uXray;
 
         float segD(vec3 p, vec3 a, vec3 b, float r) {
           vec3 pa = p - a, ba = b - a;
@@ -96,6 +103,10 @@ export function createBodyMaterial() {
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
+        // V0.2: cut a window through the skin to reveal the anatomy underneath
+        float winD = uWin.w > 0.0 ? length(vLocal - uWin.xyz) - uWin.w : 1.0;
+        if (winD < 0.0) discard;
+        float winRim = uWin.w > 0.0 ? 1.0 - smoothstep(0.0, 0.007, winD) : 0.0;
         int zIdx; float zEdge;
         zoneOf(vLocal, zIdx, zEdge);
         float zGlow = uGlow[zIdx];
@@ -106,7 +117,10 @@ export function createBodyMaterial() {
         diffuseColor.rgb = mix(diffuseColor.rgb, uTint[zIdx], zTint * 0.55 * breathe);
         // dim everything except the focused zone
         diffuseColor.rgb *= 1.0 - uFocus * (1.0 - isFocus) * 0.32;
-        diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, uAccent, 0.55), zGlow * (1.0 - uGlass * 0.5));`,
+        diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, uAccent, 0.55), zGlow * (1.0 - uGlass * 0.5));
+        // the inside wall of the cut reads as a soft, darker shell
+        if (!gl_FrontFacing) diffuseColor.rgb *= vec3(0.62, 0.5, 0.46);
+        diffuseColor.a *= 1.0 - uXray * 0.82;`,
       )
       .replace(
         '#include <emissivemap_fragment>',
@@ -118,7 +132,9 @@ export function createBodyMaterial() {
         totalEmissiveRadiance += uAccent * zGlow * (0.18 + 0.22 * fres) * pulse;
         totalEmissiveRadiance += uAccent * line * zGlow * 0.9;
         totalEmissiveRadiance += uTint[zIdx] * zTint * (0.10 + 0.35 * fres) * breathe;
-        totalEmissiveRadiance += uRim * fres * uRimAmt * (1.0 - uFocus * (1.0 - isFocus) * 0.6);`,
+        totalEmissiveRadiance += uRim * fres * uRimAmt * (1.0 - uFocus * (1.0 - isFocus) * 0.6);
+        totalEmissiveRadiance += uAccent * winRim * 1.4;
+        totalEmissiveRadiance += uRim * fres * uXray * 0.5;`,
       )
   }
   mat.customProgramCacheKey = () => 'soma-body'

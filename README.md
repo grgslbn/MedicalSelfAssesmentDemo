@@ -31,4 +31,14 @@ npm run build:single   # one self-contained HTML file in dist-single/
 | **Guidance** | `src/logic/triage.ts` is a conservative rule set with four levels (self-care, GP, urgent care, emergency), and each result shows the reasons behind it. `src/logic/nudges.ts` gives preventive screening reminders. |
 | **State** | Zustand, persisted to `localStorage`. Nothing leaves the device. |
 
+## V0.2 preview: anatomy layer
+
+Off by default. Turn it on in **Settings → Preview → Anatomy layer**, which downloads about 4 MB on first use.
+
+- **Look inside:** tap a zone and a soft-edged window opens in the skin at that spot, revealing the bones, organs and muscles underneath.
+- **Where exactly?** A new first step in the symptom sheet lets you tap a structure, or pick it from a plain-language list ("Kneecap (patella)"). It's saved with the symptom and shown on the summary.
+- **X-ray:** a dock button makes the whole body see-through, with Bones, Organs and Muscles layer toggles.
+
+The data is a lean subset of **BodyParts3D 4.0** (© DBCLS, CC BY 4.0) taken from [human-atlas](https://github.com/ashemag/human-atlas): 119 structures, 174k triangles, 4 MB. `scripts/extract-anatomy.mts` builds it into `public/anatomy/`. It picks the subset, fits the adult male reference to Soma's figure, maps each structure to the zones it spans, and generates approximate lungs and liver, which the dataset lacks. Full credits are in [public/anatomy/ATTRIBUTION.md](public/anatomy/ATTRIBUTION.md).
+
 Stack: React 19 · TypeScript · Vite · three.js / react-three-fiber / drei · Framer Motion · Zustand.
