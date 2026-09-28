@@ -25,8 +25,8 @@ function angleDamp(cur: number, goal: number, lambda: number, dt: number) {
 
 // ── Palettes for the 3D world ────────────────────────────────────────────
 const WORLD = {
-  light: { top: '#f8f5f0', bottom: '#e8e1d7', floor: '#d9cfc2', clay: '#e6d4c2', glass: '#f7faff', rim: '#ffffff', accent: '#3f9c89', shadow: '#6b5a48' },
-  dark: { top: '#1a2029', bottom: '#0a0d11', floor: '#12161c', clay: '#d6c3b0', glass: '#dbe9ff', rim: '#9bd7ff', accent: '#5cc7ae', shadow: '#000000' },
+  light: { top: '#f8f5f0', bottom: '#e8e1d7', floor: '#d9cfc2', clay: '#e6d4c2', glass: '#f7faff', poly: '#ddd4ca', edge: '#1c2230', edgeA: 0.075, rim: '#ffffff', accent: '#3f9c89', shadow: '#6b5a48' },
+  dark: { top: '#1a2029', bottom: '#0a0d11', floor: '#12161c', clay: '#d6c3b0', glass: '#dbe9ff', poly: '#9aa6b6', edge: '#7fe3ff', edgeA: 0.2, rim: '#9bd7ff', accent: '#5cc7ae', shadow: '#000000' },
 }
 
 function Backdrop({ dark }: { dark: boolean }) {
@@ -136,24 +136,26 @@ function Pins() {
   const entries = useStore((s) => s.entries)
   const select = useStore((s) => s.select)
   const selected = useStore((s) => s.selected)
+  // the low-poly surface sits a little proud of the sculpt, so lift pins clear of it
+  const lift = useStore((s) => (s.bodyStyle === 'poly' ? 0.011 : 0.004))
   const pins = entries.filter((e) => e.point && e.regionId !== 'general')
   return (
     <>
       {pins.map((e) => (
-        <Pin key={e.id} id={e.id} regionId={e.regionId} point={e.point!} normal={e.normal ?? [0, 0, 1]} intensity={e.intensity}
+        <Pin key={e.id} id={e.id} regionId={e.regionId} point={e.point!} normal={e.normal ?? [0, 0, 1]} intensity={e.intensity} lift={lift}
           dim={!!selected} onPick={() => select(e.regionId, { point: e.point!, normal: e.normal ?? [0, 0, 1] }, e.id)} />
       ))}
     </>
   )
 }
 
-function Pin({ point, normal, intensity, onPick, dim }: { id: string; regionId: string; point: [number, number, number]; normal: [number, number, number]; intensity: number; onPick: () => void; dim: boolean }) {
+function Pin({ point, normal, intensity, onPick, dim, lift }: { id: string; regionId: string; point: [number, number, number]; normal: [number, number, number]; intensity: number; onPick: () => void; dim: boolean; lift: number }) {
   const ring = useRef<THREE.Mesh>(null!)
   const dot = useRef<THREE.Mesh>(null!)
   const born = useRef(performance.now())
   const color = useMemo(() => new THREE.Color(intensityColor(intensity)), [intensity])
   const n = useMemo(() => new THREE.Vector3(...normal).normalize(), [normal])
-  const pos = useMemo(() => new THREE.Vector3(...point).addScaledVector(n, 0.004), [point, n])
+  const pos = useMemo(() => new THREE.Vector3(...point).addScaledVector(n, lift), [point, n, lift])
   const q = useMemo(() => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n), [n])
   useFrame(({ clock }) => {
     const age = (performance.now() - born.current) / 1000
@@ -179,8 +181,15 @@ function Pin({ point, normal, intensity, onPick, dim }: { id: string; regionId: 
 }
 
 function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
-  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null)
+  const [detailed, setDetailed] = useState<THREE.BufferGeometry | null>(null)
+  const [lowpoly, setLowpoly] = useState<THREE.BufferGeometry | null>(null)
   const { mat, uniforms } = useMemo(createBodyMaterial, [])
+  const edgeMat = useMemo(() => new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false }), [])
+  const edges = useMemo(() => (lowpoly ? new THREE.EdgesGeometry(lowpoly, 1) : null), [lowpoly])
+  // which mesh is on screen, and a 0→1 swap transition (squash + flash, swap at the midpoint)
+  const [shown, setShown] = useState<'detailed' | 'lowpoly'>(useStore.getState().bodyStyle === 'poly' ? 'lowpoly' : 'detailed')
+  const swap = useRef(1)
+  const polyC = useMemo(() => new THREE.Color(), [])
   const group = useRef<THREE.Group>(null!)
   const intro = useRef(0)
   const dark = useIsDark()
@@ -194,13 +203,21 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
 
   useEffect(() => {
     let alive = true
-    loadBodyGeometry().then((g) => {
+    const wantPoly = useStore.getState().bodyStyle === 'poly'
+    const first = loadBodyGeometry(wantPoly ? 'lowpoly' : 'detailed')
+    first.then((g) => {
       if (!alive) return
-      setGeo(g)
+      if (wantPoly) setLowpoly(g); else setDetailed(g)
       set({ bodyReady: true })
+      // warm the other look in the background so switching is instant
+      loadBodyGeometry(wantPoly ? 'detailed' : 'lowpoly').then((o) => { if (alive) (wantPoly ? setDetailed : setLowpoly)(o) })
     })
     return () => { alive = false }
   }, [set])
+
+  const target = bodyStyle === 'poly' ? 'lowpoly' : 'detailed'
+  useEffect(() => { if (target !== shown) swap.current = 0 }, [target, shown])
+  const geo = shown === 'lowpoly' ? lowpoly : detailed
 
   useFrame(({ clock }, dt) => {
     const s = useStore.getState()
@@ -225,6 +242,35 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
     uniforms.uRimAmt.value = THREE.MathUtils.lerp(dark ? 0.18 : 0.12, dark ? 0.9 : 0.55, g)
     uniforms.uAccent.value.set(w.accent)
     uniforms.uTime.value = clock.elapsedTime
+
+    // clay/glass ⇄ poly: squash, flash, swap meshes at the midpoint
+    let squash = 0
+    if (swap.current < 1) {
+      const ready = target === 'lowpoly' ? lowpoly : detailed
+      if (ready) {
+        swap.current = reduced ? 1 : Math.min(1, swap.current + dt / 0.55)
+        if (swap.current >= 0.5 && shown !== target) setShown(target)
+        squash = Math.sin(Math.PI * swap.current)
+      }
+    }
+    const isPoly = shown === 'lowpoly'
+    if (mat.flatShading !== isPoly) { mat.flatShading = isPoly; mat.needsUpdate = true }
+    mat.polygonOffset = isPoly
+    mat.polygonOffsetFactor = 1
+    mat.polygonOffsetUnits = 1
+    if (isPoly) {
+      polyC.set(w.poly)
+      mat.color.copy(polyC)
+      mat.roughness = 0.78
+      mat.sheen = 0
+      mat.clearcoat = 0.12
+      mat.clearcoatRoughness = 0.5
+      mat.envMapIntensity = 0.45 // let the key light carve the facets
+      uniforms.uRimAmt.value = dark ? 0.35 : 0.1
+    }
+    edgeMat.color.set(w.edge)
+    edgeMat.opacity = w.edgeA * (1 - squash)
+    uniforms.uRimAmt.value += squash * 0.9 // the flash
 
     // per-zone glow & tint
     const selIdx = s.selected && s.selected !== 'general' ? REGION_INDEX[s.selected] : -1
@@ -252,7 +298,7 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
     const k = 1 - Math.pow(1 - intro.current, 4)
     const breathe = reduced ? 0 : Math.sin(clock.elapsedTime * 1.3) * 0.0035
     group.current.position.y = (1 - k) * -0.12
-    group.current.scale.set(1 + breathe * 0.6, 1 + breathe, 1 + breathe * 0.6)
+    group.current.scale.set(1 + breathe * 0.6 + squash * 0.02, 1 + breathe - squash * 0.035, 1 + breathe * 0.6 + squash * 0.02)
     mat.opacity = k
     mat.transparent = k < 1
   })
@@ -284,6 +330,7 @@ function Body({ glassRef }: { glassRef: React.MutableRefObject<number> }) {
       {geo && (
         <mesh geometry={geo} material={mat} raycast={acceleratedRaycast} castShadow onPointerDown={onDown} onClick={onClick} onPointerMove={onMove} onPointerOut={onOut} />
       )}
+      {edges && shown === 'lowpoly' && <lineSegments geometry={edges} material={edgeMat} raycast={() => null} />}
       <Inner glass={glassRef} />
       <Pins />
     </group>

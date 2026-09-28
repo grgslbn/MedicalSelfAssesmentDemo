@@ -71,6 +71,9 @@ export const Icon = {
   scale: ({ size, ...p }: P) => (<svg {...base(size)} {...p}><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M8.5 9a5 5 0 0 1 7 0l-2.2 2.6" /></svg>),
   moon: ({ size, ...p }: P) => (<svg {...base(size)} {...p}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>),
   clay: ({ size, ...p }: P) => (<svg {...base(size)} {...p}><circle cx="12" cy="12" r="8" fill="currentColor" fillOpacity=".22" /></svg>),
+  poly: ({ size, ...p }: P) => (
+    <svg {...base(size)} {...p}><path d="M12 3.5l7.5 4.5v8L12 20.5 4.5 16V8z" /><path d="M12 3.5l-2.5 9 9.5 3.5M9.5 12.5L4.5 16M9.5 12.5l2.5 8M9.5 12.5L4.5 8M19.5 8l-10 4.5" /></svg>
+  ),
   glass: ({ size, ...p }: P) => (
     <svg {...base(size)} {...p}><circle cx="12" cy="12" r="8" /><path d="M8.5 9.5a4.5 4.5 0 0 1 3-2.5" /></svg>
   ),

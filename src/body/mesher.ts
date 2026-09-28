@@ -16,11 +16,22 @@ export interface Patch extends Box {
   exclude?: Box[]
   /** push vertices inside these boxes slightly below the surface */
   inset?: Box[]
+  /** grow the surface outwards by this many metres (fuses thin parts) */
+  inflate?: number
+  /** randomly offset cell vertices by this fraction of a cell (irregular facets) */
+  jitter?: number
 }
 export interface MeshData { positions: Float32Array; normals: Float32Array; indices: Uint32Array }
 
 const inside = (b: Box, x: number, y: number, z: number) =>
   x > b.min[0] && x < b.max[0] && y > b.min[1] && y < b.max[1] && z > b.min[2] && z < b.max[2]
+
+/** Deterministic 0..1 hash so the facets look the same on every load. */
+function hash(n: number) {
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b)
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b)
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296
+}
 
 export function shrink(b: Box, m: number): Box {
   return { min: [b.min[0] + m, b.min[1] + m, b.min[2] + m], max: [b.max[0] - m, b.max[1] - m, b.max[2] - m] }
@@ -28,6 +39,8 @@ export function shrink(b: Box, m: number): Box {
 
 export function meshPatch(patch: Patch): MeshData {
   const { min, max, h } = patch
+  const inflate = patch.inflate ?? 0
+  const sdf = (list: Prim[], x: number, y: number, z: number) => sdfWith(list, x, y, z) - inflate
   const nx = Math.ceil((max[0] - min[0]) / h) + 1
   const ny = Math.ceil((max[1] - min[1]) / h) + 1
   const nz = Math.ceil((max[2] - min[2]) / h) + 1
@@ -58,11 +71,11 @@ export function meshPatch(patch: Patch): MeshData {
       blockLists[blockId(bi, bj, bk)] = list
       const cx = (bmin[0] + bmax[0]) / 2, cy = (bmin[1] + bmax[1]) / 2, cz = (bmin[2] + bmax[2]) / 2
       const halfDiag = 0.5 * Math.hypot(bmax[0] - bmin[0], bmax[1] - bmin[1], bmax[2] - bmin[2])
-      const dc = list.length ? sdfWith(list, cx, cy, cz) : 1
+      const dc = list.length ? sdf(list, cx, cy, cz) : 1
       const far = Math.abs(dc) > halfDiag + h
       for (let k = bk; k <= ck; k++) for (let j = bj; j <= cj; j++) {
         let idx = k * sxy + j * nx + bi
-        for (let i = bi; i <= ci; i++, idx++) field[idx] = far ? dc : sdfWith(list, px(i), py(j), pz(k))
+        for (let i = bi; i <= ci; i++, idx++) field[idx] = far ? dc : sdf(list, px(i), py(j), pz(k))
       }
     }
   }
@@ -92,7 +105,12 @@ export function meshPatch(patch: Patch): MeshData {
       ax += xa + (xb - xa) * t; ay += ya + (yb - ya) * t; az += za + (zb - za) * t; n++
     }
     cellVert[k * cx1 * cy1 + j * cx1 + i] = verts.length / 3
-    verts.push(px(i) + (ax / n) * h, py(j) + (ay / n) * h, pz(k) + (az / n) * h)
+    let jx = 0, jy = 0, jz = 0
+    if (patch.jitter) {
+      const c = i * 73856093 ^ j * 19349663 ^ k * 83492791
+      jx = (hash(c) - 0.5) * patch.jitter; jy = (hash(c + 1) - 0.5) * patch.jitter; jz = (hash(c + 2) - 0.5) * patch.jitter
+    }
+    verts.push(px(i) + (ax / n + jx) * h, py(j) + (ay / n + jy) * h, pz(k) + (az / n + jz) * h)
     vBlock.push(blockId(i, j, k))
   }
 
@@ -106,10 +124,10 @@ export function meshPatch(patch: Patch): MeshData {
     let x = positions[v * 3], y = positions[v * 3 + 1], z = positions[v * 3 + 2]
     let gx = 0, gy = 1, gz = 0
     for (let it = 0; it < 3; it++) {
-      const d = sdfWith(list, x, y, z)
-      gx = sdfWith(list, x + e, y, z) - sdfWith(list, x - e, y, z)
-      gy = sdfWith(list, x, y + e, z) - sdfWith(list, x, y - e, z)
-      gz = sdfWith(list, x, y, z + e) - sdfWith(list, x, y, z - e)
+      const d = sdf(list, x, y, z)
+      gx = sdf(list, x + e, y, z) - sdf(list, x - e, y, z)
+      gy = sdf(list, x, y + e, z) - sdf(list, x, y - e, z)
+      gz = sdf(list, x, y, z + e) - sdf(list, x, y, z - e)
       const gl = Math.hypot(gx, gy, gz) || 1
       gx /= gl; gy /= gl; gz /= gl
       if (it === 2) break

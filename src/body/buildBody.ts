@@ -31,6 +31,13 @@ export function buildBodyArrays(detail = 1): MeshData {
   return mergeMeshes(parts)
 }
 
+/** Low-poly variant: one coarse, slightly inflated patch with jittered, irregular facets. */
+export function buildLowPolyArrays(): MeshData {
+  return meshPatch({ ...BODY, h: 0.022, inflate: 0.005, jitter: 0.38 })
+}
+
+export type BodyKind = 'detailed' | 'lowpoly'
+
 export function toGeometry({ positions, normals, indices }: MeshData) {
   const g = new BufferGeometry()
   g.setAttribute('position', new BufferAttribute(positions, 3))
@@ -43,13 +50,15 @@ export function toGeometry({ positions, normals, indices }: MeshData) {
   return g
 }
 
-let pending: Promise<BufferGeometry> | null = null
+const pending: Partial<Record<BodyKind, Promise<BufferGeometry>>> = {}
 
-/** Build the body off the main thread (falls back to inline if workers are unavailable). */
-export function loadBodyGeometry(detail = 1): Promise<BufferGeometry> {
-  if (pending) return pending
-  pending = new Promise((resolve) => {
-    const inline = () => resolve(toGeometry(buildBodyArrays(detail)))
+/** Build a body off the main thread (falls back to inline if workers are unavailable). */
+export function loadBodyGeometry(kind: BodyKind = 'detailed', detail = 1): Promise<BufferGeometry> {
+  const cached = pending[kind]
+  if (cached) return cached
+  const build = () => (kind === 'lowpoly' ? buildLowPolyArrays() : buildBodyArrays(detail))
+  return (pending[kind] = new Promise((resolve) => {
+    const inline = () => resolve(toGeometry(build()))
     try {
       const w = new BodyWorker()
       w.onmessage = (e: MessageEvent<MeshData>) => {
@@ -57,10 +66,9 @@ export function loadBodyGeometry(detail = 1): Promise<BufferGeometry> {
         w.terminate()
       }
       w.onerror = () => { w.terminate(); inline() }
-      w.postMessage({ detail })
+      w.postMessage({ kind, detail })
     } catch {
       inline()
     }
-  })
-  return pending
+  }))
 }

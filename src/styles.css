@@ -109,7 +109,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 }
 .icon-btn:hover { background: var(--surface-solid); }
 .icon-btn.on { background: var(--ink); color: var(--paper); }
-@media (max-width: 380px) { .hide-xs { display: none; } }
+@media (max-width: 480px) { .hide-xs { display: none; } .topbar .seg button { padding: 8px 11px; } }
 
 /* ─────────────────────────────  Segmented  ───────────────────────────── */
 .seg {

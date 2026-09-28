@@ -22,9 +22,10 @@ npm run build:single   # one self-contained HTML file in dist-single/
 
 | | |
 |---|---|
-| **3D body** | `src/body/sdf.ts` sculpts a seamless, gender-neutral figure from signed-distance primitives. It is meshed with marching cubes in a Web Worker (`buildBody.ts`, `body.worker.ts`). |
+| **3D body** | `src/body/sdf.ts` sculpts a seamless, gender-neutral figure (fingers, face, toes) from signed-distance primitives. `mesher.ts` meshes it with multi-resolution surface nets in a Web Worker: fine patches for the head, hands and feet. `inspect.html` is a dev-only close-up viewer. |
 | **Zones** | `src/data/regions.ts` defines 24 tappable zones as capsules. The same maths runs on the CPU (tap → zone) and in the shader (`bodyMaterial.ts`), which paints the glow, outlines and symptom tints directly on the surface. |
 | **Clay ⇄ Glass** | A single `MeshPhysicalMaterial` morphs between matte clay and transmissive glass. In glass mode a beating heart and the spine show through. |
+| **Low poly** | A third look: a separate coarse, jittered mesh of the same sculpt (`buildLowPolyArrays`), flat-shaded with a fine triangle wireframe. Switching to or from it squashes, flashes and swaps meshes at the midpoint. |
 | **Camera** | Critically-damped rig (`Scene.tsx › CameraRig`). It eases to the tapped zone, flips front/back, and shifts the framing so the body stays visible beside the sheet or panel. |
 | **Flow** | Onboarding → Explore → Symptom sheet (what · how much · since when · red flags) → Summary → History. |
 | **Guidance** | `src/logic/triage.ts` is a conservative rule set with four levels (self-care, GP, urgent care, emergency), and each result shows the reasons behind it. `src/logic/nudges.ts` gives preventive screening reminders. |

@@ -1,5 +1,5 @@
 /**
- * Dev-only close-up viewer for the sculpt: /inspect.html?view=face|hand|foot|full|back&glass
+ * Dev-only close-up viewer for the sculpt: /inspect.html?view=face|hand|foot|full|back&glass&poly
  * Not part of the production build.
  */
 import { createRoot } from 'react-dom/client'
@@ -27,7 +27,8 @@ function Body() {
   const { mat, uniforms } = useMemo(createBodyMaterial, [])
   useEffect(() => {
     if (q.has('glass')) { mat.transmission = 1; mat.roughness = 0.16; mat.color.set('#f7faff'); uniforms.uRimAmt.value = 0.55 }
-    loadBodyGeometry().then((g) => {
+    if (q.has('poly')) { mat.flatShading = true; mat.roughness = 0.85; mat.sheen = 0; mat.color.set('#d8d0c6'); mat.needsUpdate = true }
+    loadBodyGeometry(q.has('poly') ? 'lowpoly' : 'detailed').then((g) => {
       setGeo(g)
       const t = g.index!.count / 3
       document.title = `ready ${t} tris`
